@@ -1,0 +1,31 @@
+---
+# tasks file for create
+- name: Configuração de módulos de kernel
+  hosts: servers
+  tasks:
+
+  #- name: Kernel Modules Configuration
+   # become: yes
+    #file:
+     # path: /etc/modules-load.d/
+      #state: directory
+      #mode: '0755'
+
+  - name: Criando arquivo k8s.conf
+    become: yes
+    file:
+      path: /etc/modules-load.d/k8s.conf
+      state: touch
+      mode: u+rw,g+r,o+r
+
+  - name: Adicionando módulos do kernel GNU/Linux
+    become: yes
+    lineinfile:
+      path: /etc/modules-load.d/k8s.conf
+      line: '{{item}}'
+    with_items: 
+      - 'br_netfilter' 
+      - 'ip_vs ip_vs_rr'
+      - 'ip_vs_sh' 
+      - 'ip_vs_wrr' 
+      - 'nf_conntrack_ipv4'

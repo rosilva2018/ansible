@@ -1,0 +1,11 @@
+---
+# tasks file for create
+- name: Add openjdk
+  hosts: servers
+  tasks:
+
+  - name: Install java
+    become: yes
+    apt:
+      name: openjdk-11-jdk
+      update_cache: yes
