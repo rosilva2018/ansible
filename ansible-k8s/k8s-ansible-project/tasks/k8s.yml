@@ -75,3 +75,21 @@
     ansible.builtin.systemd:
       name: docker
       state: restarted
+
+  - name: Create a directory docker.service.d
+    become: yes    
+    file:
+      path: /etc/systemdsystem/docker.service.d
+      state: directory
+      mode: '0755'
+
+  - name: Restart service daemon-reload
+    become: yes
+    ansible.builtin.systemd:
+      daemon_reload: yes
+    
+  - name: Restart service Docker
+    become: yes
+    ansible.builtin.systemd:
+      name: docker
+      state: restarted
