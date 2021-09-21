@@ -1,11 +1,140 @@
 ---
 # tasks file for create
-- name: Add openjdk
+# VERSION: 1.0
+
+- name: SETUP CLUSTER KUBERNETES AWS EC2
   hosts: servers
   tasks:
 
-  - name: Install java
+  - name: CREATING  k8s.conf file 
     become: yes
-    apt:
-      name: openjdk-11-jdk
-      update_cache: yes
+    file:
+      path: /etc/modules-load.d/k8s.conf
+      state: touch
+      mode: u+rw,g+r,o+r
+
+  - name: ADDING GNU/Linux kernel modules
+    become: yes
+    lineinfile:
+      path: /etc/modules-load.d/k8s.conf
+      line: '{{item}}'
+    with_items: 
+      - 'br_netfilter' 
+      - 'ip_vs ip_vs_rr'
+      - 'ip_vs_sh' 
+      - 'ip_vs_wrr' 
+      - 'nf_conntrack_ipv4'
+
+  - name: INSTALLING PACKAGES AND DEPENDENCIES
+    become: yes
+    apt: name={{ item }} state=latest update_cache=yes
+    loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'python3-pip', 'virtualenv', 'python3-setuptools']
+
+  - name: ADDING GPG/Key DOCKER 
+    become: yes
+    apt_key:
+      url: https://download.docker.com/linux/ubuntu/gpg
+      state: present
+
+  - name: Adding Docker to the /etc/apt/sources.list.d repository
+    become: yes
+    apt_repository:
+      repo: deb https://download.docker.com/linux/ubuntu bionic stable
+      state: present
+
+  - name: UPDATE
+    become: yes
+    apt: update_cache=yes name=docker-ce state=latest
+
+  - name: SETUP DOCKER
+    become: yes
+    pip:
+      name: docker
+
+  - name: CREATING cgroupdriver FILES 
+    become: yes
+    file:
+      path: /etc/docker/daemon.json
+      state: touch
+      mode: u+rw,g+r,o+r
+
+  - name: COPY FILE AND SETTING PERMISSIONS
+    become: yes
+    ansible.builtin.copy:
+      src: /home/rogerio/repos/meus-repos/ansible/ansible-k8s/k8s-ansible-project/tasks/daemon.json
+      dest: /etc/docker/daemon.json
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: RESTART SERVICE daemon-reload
+    become: yes
+    ansible.builtin.systemd:
+      daemon_reload: yes
+    
+  - name: RESTART SERVICE docker
+    become: yes
+    ansible.builtin.systemd:
+      name: docker
+      state: restarted
+
+  - name: CREATE DIRECTORY docker.service.d 
+    become: yes    
+    file:
+      path: /etc/systemdsystem/docker.service.d
+      state: directory
+      mode: '0755'
+
+  - name:  RESTART SERVICE daemon-reload
+    become: yes
+    ansible.builtin.systemd:
+      daemon_reload: yes
+    
+  - name: RESTART SERVICE docker
+    become: yes
+    ansible.builtin.systemd:
+      name: docker
+      state: restarted
+
+  - name: UPDATE
+    become: yes
+    apt: update_cache=yes
+
+  - name: INSTALLING PACKAGES K8S
+    become: yes
+    apt: name={{ item }} state=latest update_cache=yes
+    loop: [ 'apt-transport-https', 'ca-certificates','curl']
+
+  - name: DOWNLOAD GOOGLE CLOUD PUBLIC SIGNING KEY
+    become: yes
+    get_url:
+      url:  https://packages.cloud.google.com/apt/doc/apt-key.gpg
+      dest: /usr/share/keyrings/kubernetes-archive-keyring.gpg
+
+  - name: ADD K8S REPOS
+    become: yes
+    apt_repository:
+      repo: deb [signed-by=/usr/share/keyrings/kubernetes-archive-keyring.gpg] https://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+
+  - name: UPDATING THE APT PACKAGE INDEX
+    become: yes
+    apt: update_cache=yes
+
+  - name: SETUP KUBELET KUBEADM KUBECTL
+    become: yes
+    apt: name={{ item }} state=latest update_cache=yes
+    loop: [ 'kubelet', 'kubeadm', 'kubectl']
+
+  - name: NEXT STEPS
+    ansible.builtin.debug:
+      msg:
+      - "DISABLE SWAP <swapoff -a>"
+      - "DOWLOAD IMAGES K8S <kubeadm config images pull>"
+      - "SETUP CLUSTER K8S <kubeadm init>"
+      - "To start using your cluster, you need to run the following as a regular user:
+         mkdir -p $HOME/.kube
+         sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+         sudo chown $(id -u):$(id -g) $HOME/.kube/config"
+      - "SETUP POD NETWORK <DEPLOY: kubectl apply -f <https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')>"
+      - "SETUP NODES <kubeadm token create --print-join-command>"
